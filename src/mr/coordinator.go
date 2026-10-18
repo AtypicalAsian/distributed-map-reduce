@@ -165,7 +165,21 @@ func (c *Coordinator) Done() bool {
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
 
-	// Your code here.
+	// Create map tasks (one per input file)
+	c.mapTasks = make([]Task, len(files))
+	for i, file := range files {
+		c.mapTasks[i].filename = file
+		c.mapTasks[i].taskID = i
+	}
+
+	// Create reduce tasks
+	c.reduceTasks = make([]Task, nReduce)
+	for i := range nReduce {
+		c.reduceTasks[i].taskID = i
+	}
+
+	// Set nReduce
+	c.nReduce = nReduce
 
 	c.server()
 	return &c
