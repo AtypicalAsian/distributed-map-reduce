@@ -154,7 +154,7 @@ the job survives randomly crashing workers. A passing run will look like this:
 To check for rare bugs, run the suite many times in a row: `bash test-mr-many.sh 20`.
 To check for data races, uncomment `RACE=-race` at the top of `test-mr.sh` and run the test suite again.
 
-**Run a job by hand (word count):**
+**Run a job by hand (extract word count):**
 ```bash
 cd src/main
 go build -buildmode=plugin ../mrapps/wc.go
@@ -167,4 +167,6 @@ cat mr-out-* | sort | more           # view the combined result
 ```
 
 ## Demo
+https://github.com/user-attachments/assets/b56656bf-d079-4281-a4bb-89034662fe84
+
 
