@@ -33,17 +33,6 @@ const (
 	Completed
 )
 
-//Need to implement
-// 1. Assign Task RPC handler
-// 2. Report task RPC handler
-// 3. Done() method to check if all tasks are done
-// 4. Failure detection: if a job isn't done in 10 seconds, mark it as failed and reassign
-// 5. State management: keep track of which tasks are assigned, completed, and failed.
-// 		Only hand out reduce tasks when all map tasks are completed
-// 5. Locking: mutex to lock the shared state to prevent race conditions when updating shared state
-
-// Your code here -- RPC handlers for the worker to call.
-
 // an example RPC handler.
 //
 // the RPC argument and reply types are defined in rpc.go.
@@ -156,8 +145,17 @@ func (c *Coordinator) server() {
 func (c *Coordinator) Done() bool {
 	ret := false
 
-	// Your code here.
+	//Acquire Lock (since it may read shared state while RPC handlers may be changing it)
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
+	// Only need to check reduce tasks before reduce tasks can't start unless all map tasks complete
+	for _, task := range c.reduceTasks {
+		if task.taskStatus != Completed {
+			return ret
+		}
+	}
+	ret = true
 	return ret
 }
 
