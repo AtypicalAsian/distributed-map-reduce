@@ -3,8 +3,6 @@ package mr
 //
 // RPC definitions.
 //
-// remember to capitalize all names.
-//
 
 import (
 	"os"
@@ -24,38 +22,34 @@ type ExampleReply struct {
 	Y int
 }
 
-// Add your RPC definitions here.
-
-// Define the type of task that the worker can perform
 type TaskType int
 
 const (
 	MapTask TaskType = iota
 	ReduceTask
-	WaitTask
-	ExitTask
+	WaitTask // nothing available yet; ask again shortly
+	ExitTask // job is finished; worker should exit
 )
 
-// Used when a worker asks for a task from the coordinator
+// Sent by a worker asking for a task. The coordinator decides what to assign,
+// so no fields are needed.
 type TaskRequestArgs struct {
 }
 
-// Used when the coordinator replies to a worker with a task
 type TaskRequestReply struct {
-	Filename string   // name of file to process
-	TaskType TaskType // type of task (MAP or REDUCE)
-	NReduce  int      // how many buckets for reduce (for MAP tasks)
-	NMap     int      // number of MAP tasks (for REDUCE) or number of input files
-	TaskID   int      // unique ID for the task
+	Filename string // input file (map tasks only)
+	TaskType TaskType
+	NReduce  int // number of buckets to partition into (map tasks)
+	NMap     int // number of map tasks, i.e. intermediate files to read (reduce tasks)
+	TaskID   int
 }
 
-// Used when a worker tells the coordinator it has finished a task
+// Sent by a worker when it has finished a task.
 type TaskResultArgs struct {
-	TaskID   int      // unique ID for the task
-	TaskType TaskType // type of task (MAP or REDUCE)
+	TaskID   int
+	TaskType TaskType
 }
 
-// Used when the coordinator replies to a worker after it has finished a task
 type TaskResultReply struct {
 }
 

@@ -10,19 +10,20 @@ import (
 	"time"
 )
 
-// Used as shared state. Keeps track of the tasks and their statuses.
+// Coordinator tracks every map and reduce task. Its state is shared by
+// concurrent RPC handlers, so all access goes through mutex.
 type Coordinator struct {
-	mapTasks    []Task // list of tasks for map tasks
-	reduceTasks []Task // list of tasks for reduce tasks
+	mapTasks    []Task // one per input file
+	reduceTasks []Task // one per bucket
 	nReduce     int
-	mutex       sync.Mutex // lock to protect shared state from race conditions
+	mutex       sync.Mutex
 }
 
 type Task struct {
 	taskID     int
 	taskStatus TaskStatus
 	startTime  time.Time
-	filename   string // for map tasks only
+	filename   string // map tasks only
 }
 
 type TaskStatus int
@@ -41,26 +42,22 @@ func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 	return nil
 }
 
-// AssignTask RPC Handler
+// AssignTask hands the calling worker one task. Tasks are available if they
+// are idle, or if they have been in progress for over 10s (worker presumed dead).
+// Reduce tasks are only handed out once every map task has completed.
 func (c *Coordinator) AssignTask(args *TaskRequestArgs, reply *TaskRequestReply) error {
-	//Acquire lock
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	// MAP PHASE
-
-	// Go through map tasks ID, if a task is idle OR in progress for more than 10 seconds
-	// -> assign to a new worker + mark task as in progress + set start time to now
+	// Map phase
 	for i, task := range c.mapTasks {
 		if task.taskStatus == Idle || (task.taskStatus == InProgress && time.Since(task.startTime) > 10*time.Second) {
-			// Assign task to worker
 			reply.Filename = task.filename
 			reply.TaskType = MapTask
 			reply.NReduce = c.nReduce
 			reply.NMap = len(c.mapTasks)
 			reply.TaskID = task.taskID
 
-			// Mark task as in progress and set start time to now
 			c.mapTasks[i].taskStatus = InProgress
 			c.mapTasks[i].startTime = time.Now()
 
@@ -68,27 +65,21 @@ func (c *Coordinator) AssignTask(args *TaskRequestArgs, reply *TaskRequestReply)
 		}
 	}
 
-	// If all tasks pending (not complete) -> no more to assign -> wait the worker
+	// All map tasks are taken but some are still running: wait before reducing.
 	for _, task := range c.mapTasks {
-		if task.taskStatus != Completed { // if any task is still not completed but none left to give out
+		if task.taskStatus != Completed {
 			reply.TaskType = WaitTask
 			return nil
 		}
 	}
 
-	// If all map tasks completed -> exit loop and move to reduce phase
-
-	// REDUCE PHASE
-	// Go through reduce tasks ID, if a task is idle OR in progress for more than 10 seconds
-	// -> assign to a new worker + mark task as in progress + set start time to now
+	// Reduce phase
 	for i, task := range c.reduceTasks {
 		if task.taskStatus == Idle || (task.taskStatus == InProgress && time.Since(task.startTime) > 10*time.Second) {
-			// Assign to new worker
 			reply.TaskType = ReduceTask
 			reply.TaskID = task.taskID
 			reply.NMap = len(c.mapTasks)
 
-			// Mark task as in progress + set start time to Now
 			c.reduceTasks[i].taskStatus = InProgress
 			c.reduceTasks[i].startTime = time.Now()
 
@@ -96,7 +87,6 @@ func (c *Coordinator) AssignTask(args *TaskRequestArgs, reply *TaskRequestReply)
 		}
 	}
 
-	// If no more reduce tasks to assign + not all completed -> wait the worker
 	for _, task := range c.reduceTasks {
 		if task.taskStatus != Completed {
 			reply.TaskType = WaitTask
@@ -104,18 +94,16 @@ func (c *Coordinator) AssignTask(args *TaskRequestArgs, reply *TaskRequestReply)
 		}
 	}
 
-	// If all reduce tasks completed -> Reply ExitTask to worker
 	reply.TaskType = ExitTask
 	return nil
 }
 
-// ReportTask RPC Handler
+// ReportTask marks a task completed. Duplicate reports (from a slow worker
+// whose task was reassigned) are harmless.
 func (c *Coordinator) ReportTask(args *TaskResultArgs, reply *TaskResultReply) error {
-	//Acquire Lock
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	//Mark Task as Completed
 	switch args.TaskType {
 	case MapTask:
 		c.mapTasks[args.TaskID].taskStatus = Completed
@@ -145,11 +133,11 @@ func (c *Coordinator) server() {
 func (c *Coordinator) Done() bool {
 	ret := false
 
-	//Acquire Lock (since it may read shared state while RPC handlers may be changing it)
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	// Only need to check reduce tasks before reduce tasks can't start unless all map tasks complete
+	// Reduce tasks can't start until all map tasks finish,
+	// so checking reduce tasks alone is enough.
 	for _, task := range c.reduceTasks {
 		if task.taskStatus != Completed {
 			return ret
@@ -165,20 +153,17 @@ func (c *Coordinator) Done() bool {
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
 
-	// Create map tasks (one per input file)
 	c.mapTasks = make([]Task, len(files))
 	for i, file := range files {
 		c.mapTasks[i].filename = file
 		c.mapTasks[i].taskID = i
 	}
 
-	// Create reduce tasks
 	c.reduceTasks = make([]Task, nReduce)
 	for i := range nReduce {
 		c.reduceTasks[i].taskID = i
 	}
 
-	// Set nReduce
 	c.nReduce = nReduce
 
 	c.server()

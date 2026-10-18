@@ -25,20 +25,17 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-//
-// main/mrworker.go calls this function.
-//
-
+// main/mrworker.go calls this function. The worker loops forever: ask the
+// coordinator for a task, run it, report it, repeat.
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
-	// Your worker implementation here.
 	for {
 		args := TaskRequestArgs{}
 		reply := TaskRequestReply{}
 		ok := call("Coordinator.AssignTask", &args, &reply)
 		if !ok {
-			return // something went wrong with call to coordinator -> assume job is done.
+			return // coordinator unreachable: assume the job is done
 		}
 
 		switch reply.TaskType {
@@ -46,10 +43,8 @@ func Worker(mapf func(string, string) []KeyValue,
 			err := RunMapTask(mapf, reply.Filename, reply.TaskID, reply.NReduce)
 			if err != nil {
 				log.Printf("Error running map task: %v", err)
-				continue
+				continue // don't report; the coordinator will reassign after the timeout
 			}
-
-			// Call coordinator to tell it that the task is done
 			reportTask(MapTask, reply.TaskID)
 		case ReduceTask:
 			err := RunReduceTask(reducef, reply.TaskID, reply.NMap)
@@ -57,10 +52,8 @@ func Worker(mapf func(string, string) []KeyValue,
 				log.Printf("Error running reduce task: %v", err)
 				continue
 			}
-			// Call coordinator to tell it that the task is done
 			reportTask(ReduceTask, reply.TaskID)
 		case WaitTask:
-			// Wait for a second before asking for a new task
 			time.Sleep(time.Second)
 		case ExitTask:
 			return
@@ -68,10 +61,6 @@ func Worker(mapf func(string, string) []KeyValue,
 			log.Fatalf("Unknown task type: %v", reply.TaskType)
 		}
 	}
-
-	// uncomment to send the Example RPC to the coordinator.
-	// CallExample()
-
 }
 
 func reportTask(taskType TaskType, taskId int) {
@@ -86,25 +75,24 @@ func reportTask(taskType TaskType, taskId int) {
 	}
 }
 
+// RunMapTask reads one input file, runs Map on it, and partitions the output
+// into nReduce intermediate files named mr-<taskId>-<bucket>.
 func RunMapTask(mapf func(string, string) []KeyValue, filename string, taskId int, nReduce int) error {
-	// Read input
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("cannot read %v: %v", filename, err)
 	}
 	contents := string(content)
 
-	// Call mapf on input -> get a list of KeyValue pairs
 	kvPairs := mapf(filename, contents)
 
-	// Compute each key's hash -> Partition KV list into nReduce buckets
+	// Hashing the key sends every occurrence of a key to the same bucket.
 	buckets := make([][]KeyValue, nReduce)
 	for _, kv := range kvPairs {
 		bucketIndex := ihash(kv.Key) % nReduce
 		buckets[bucketIndex] = append(buckets[bucketIndex], kv)
 	}
-	// Write each bucket to a separate intermediate file in format mr-X-Y
-	// X = taskId, Y = bucket index
+
 	for y, bucket := range buckets {
 		tmp, err := os.CreateTemp(".", "mr-tmp-*")
 		if err != nil {
@@ -123,8 +111,8 @@ func RunMapTask(mapf func(string, string) []KeyValue, filename string, taskId in
 			return fmt.Errorf("cannot close temp file: %v", err)
 		}
 
-		// we don't create the intermediate file with the correct name at first to avoid
-		// the possibility of another Reduce worker reading an incomplete file.
+		// Write to a temp file and rename once complete, so a crash
+		// never leaves a partially written intermediate file behind.
 		name := fmt.Sprintf("mr-%d-%d", taskId, y)
 		if err := os.Rename(tmp.Name(), name); err != nil {
 			return fmt.Errorf("cannot rename %v to %v: %v", tmp.Name(), name, err)
@@ -134,9 +122,9 @@ func RunMapTask(mapf func(string, string) []KeyValue, filename string, taskId in
 	return nil
 }
 
+// RunReduceTask reads bucket taskId from every map task's output, groups the
+// values by key, runs Reduce on each key, and writes the results to mr-out-<taskId>.
 func RunReduceTask(reducef func(string, []string) string, taskId int, nMap int) error {
-	// Read all intermediate files for this reduce task
-	// Bucket Y = task ID for reduce worker
 	var kva []KeyValue
 	for x := 0; x < nMap; x++ {
 		filename := fmt.Sprintf("mr-%d-%d", x, taskId)
@@ -155,11 +143,9 @@ func RunReduceTask(reducef func(string, []string) string, taskId int, nMap int) 
 		file.Close()
 	}
 
-	// Group values by key
-	// If we sort the kva slice by key, the same keys will be adjacent -> can group them via a scan
+	// Sorting puts identical keys next to each other, so each group can be found with one scan.
 	sort.Slice(kva, func(i, j int) bool { return kva[i].Key < kva[j].Key })
 
-	// Call reducef for each key group and write to output file
 	tmp, err := os.CreateTemp(".", "mr-tmp-*")
 	if err != nil {
 		return fmt.Errorf("cannot create temp file: %v", err)
@@ -168,8 +154,6 @@ func RunReduceTask(reducef func(string, []string) string, taskId int, nMap int) 
 	iterator := 0
 	for iterator < len(kva) {
 		j := iterator + 1
-
-		// Collect all values for the same key
 		values := []string{}
 		for j < len(kva) && kva[j].Key == kva[iterator].Key {
 			j++
@@ -189,14 +173,12 @@ func RunReduceTask(reducef func(string, []string) string, taskId int, nMap int) 
 		return fmt.Errorf("cannot close temp file: %v", err)
 	}
 
-	// rename only once fully written, so no one sees a partial output file
 	name := fmt.Sprintf("mr-out-%d", taskId)
 	if err := os.Rename(tmp.Name(), name); err != nil {
 		return fmt.Errorf("cannot rename %v to %v: %v", tmp.Name(), name, err)
 	}
 
 	return nil
-
 }
 
 // example function to show how to make an RPC call to the coordinator.
