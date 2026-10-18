@@ -29,16 +29,6 @@ func ihash(key string) int {
 // main/mrworker.go calls this function.
 //
 
-// MAP Task
-// Coordinator replies with file name
-// Worker reads file, run Map, writes intermediate files
-// Worker tells coordinator it has finished the task
-
-// REDUCE Task
-// Coordinator replies with intermediate file names
-// Worker reads intermediate files, run Reduce, writes output file
-// Worker tells coordinator it has finished the task
-
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
