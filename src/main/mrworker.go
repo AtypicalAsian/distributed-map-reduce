@@ -10,11 +10,16 @@ package main
 // Please do not change this file.
 //
 
-import "6.5840/mr"
-import "plugin"
-import "os"
-import "fmt"
-import "log"
+import (
+	"fmt"
+	"log"
+	"os"
+	"plugin"
+
+	"6.5840/mr"
+)
+
+// Ask for Task
 
 func main() {
 	if len(os.Args) != 2 {
