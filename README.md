@@ -1,4 +1,4 @@
-# Distributed MapReduce in Go
+# Distributed MapReduce
 
 ## TLDR
 
@@ -168,4 +168,3 @@ cat mr-out-* | sort | more           # view the combined result
 
 ## Demo
 
-_Coming soon._
