@@ -151,8 +151,8 @@ the job survives randomly crashing workers. A passing run will look like this:
   *** PASSED ALL TESTS
 ```
 
-To shake out rare bugs, run the suite many times in a row: `bash test-mr-many.sh 20`.
-To check for data races, uncomment `RACE=-race` at the top of `test-mr.sh`.
+To check for rare bugs, run the suite many times in a row: `bash test-mr-many.sh 20`.
+To check for data races, uncomment `RACE=-race` at the top of `test-mr.sh` and run the test suite again.
 
 **Run a job by hand (word count):**
 ```bash
