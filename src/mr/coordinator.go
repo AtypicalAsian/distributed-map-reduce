@@ -120,6 +120,23 @@ func (c *Coordinator) AssignTask(args *TaskRequestArgs, reply *TaskRequestReply)
 	return nil
 }
 
+// ReportTask RPC Handler
+func (c *Coordinator) ReportTask(args *TaskResultArgs, reply *TaskResultReply) error {
+	//Acquire Lock
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	//Mark Task as Completed
+	switch args.TaskType {
+	case MapTask:
+		c.mapTasks[args.TaskID].taskStatus = Completed
+	case ReduceTask:
+		c.reduceTasks[args.TaskID].taskStatus = Completed
+	}
+
+	return nil
+}
+
 // start a thread that listens for RPCs from worker.go
 func (c *Coordinator) server() {
 	rpc.Register(c)
