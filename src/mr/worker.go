@@ -50,12 +50,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 
 			// Call coordinator to tell it that the task is done
-			resultArgs := TaskResultArgs{
-				TaskID:   reply.TaskID,
-				TaskType: MapTask,
-			}
-			resultReply := TaskResultReply{}
-			call("Coordinator.ReportTask", &resultArgs, &resultReply)
+			reportTask(MapTask, reply.TaskID)
 		case ReduceTask:
 			err := RunReduceTask(reducef, reply.TaskID, reply.NMap)
 			if err != nil {
@@ -63,12 +58,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				continue
 			}
 			// Call coordinator to tell it that the task is done
-			resultArgs := TaskResultArgs{
-				TaskID:   reply.TaskID,
-				TaskType: ReduceTask,
-			}
-			resultReply := TaskResultReply{}
-			call("Coordinator.ReportTask", &resultArgs, &resultReply)
+			reportTask(ReduceTask, reply.TaskID)
 		case WaitTask:
 			// Wait for a second before asking for a new task
 			time.Sleep(time.Second)
@@ -82,6 +72,18 @@ func Worker(mapf func(string, string) []KeyValue,
 	// uncomment to send the Example RPC to the coordinator.
 	// CallExample()
 
+}
+
+func reportTask(taskType TaskType, taskId int) {
+	args := TaskResultArgs{
+		TaskID:   taskId,
+		TaskType: taskType,
+	}
+	reply := TaskResultReply{}
+	ok := call("Coordinator.ReportTask", &args, &reply)
+	if !ok {
+		log.Printf("Failed to report task %d of type %v", taskId, taskType)
+	}
 }
 
 func RunMapTask(mapf func(string, string) []KeyValue, filename string, taskId int, nReduce int) error {
