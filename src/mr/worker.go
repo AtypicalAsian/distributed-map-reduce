@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/rpc"
 	"os"
+	"time"
 )
 
 // Map functions return a slice of KeyValue.
@@ -68,8 +69,8 @@ func Worker(mapf func(string, string) []KeyValue,
 			RunReduceTask()
 			// Call coordinator to tell it that the task is done
 		case WaitTask:
-			// Wait for a while before asking for a new task
-			// time.Sleep(time.Second)
+			// Wait for a second before asking for a new task
+			time.Sleep(time.Second)
 		case ExitTask:
 			return
 		default:
