@@ -4,7 +4,9 @@
 
 A small, fault-tolerant MapReduce framework in Go, based on Google's [MapReduce paper](https://research.google/pubs/mapreduce-simplified-data-processing-on-large-clusters/) and built for Lab 1 of MIT's [6.5840 Distributed Systems](https://pdos.csail.mit.edu/6.5840/) course. Familiarizing yourself with the MapReduce paper is recommended to have the best experience reading through the project.
 
-A single coordinator breaks a job into tasks and hands them out over RPC to any number of workers, which run them in parallel and take over each other's work when one crashes or stalls. In this project, the system processes eight classic books from Project Gutenberg (including *Frankenstein*, *The Picture of Dorian Gray*, *Sherlock Holmes* and *Grimm's Fairy Tales*) to produce two results: a **word count**, which shows how often every word appears across all the books, and a **text index**, which lists which books each word appears in. While the application is relatively simple, we're much more interested in the underlying system built around Map and Reduce logic that unlocks distributed computation.
+A single coordinator breaks a job into tasks and hands them out over RPC to any number of workers, which run them in parallel and take over each other's work when one crashes or stalls. In this project, the system processes eight classic books from Project Gutenberg (including *Frankenstein*, *The Picture of Dorian Gray*, *Sherlock Holmes* and *Grimm's Fairy Tales*) to produce two results: a **word count**, which shows how often every word appears across all the books, and a **text index**, which lists which books each word appears in. 
+
+While the application is relatively simple, we're much more interested in the underlying system built around Map and Reduce logic that unlocks distributed computation.
 
 ## How it Works
 
