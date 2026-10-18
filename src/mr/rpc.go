@@ -45,7 +45,7 @@ type TaskRequestReply struct {
 	Filename string   // name of file to process
 	TaskType TaskType // type of task (MAP or REDUCE)
 	NReduce  int      // how many buckets for reduce (for MAP tasks)
-	NMap     int      // how many intermediate files to read from (for REDUCE tasks)
+	NMap     int      // number of MAP tasks (for REDUCE) or number of input files
 	TaskID   int      // unique ID for the task
 }
 
