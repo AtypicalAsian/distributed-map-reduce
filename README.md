@@ -117,53 +117,88 @@ completely independently, with no coordination between them.
 
 ## Set Up & Running Tests
 
-**Requirements:** Go 1.22+ on macOS or Linux. Go plugins don't work on Windows.
+### 1. Prerequisites
 
-On macOS, install `coreutils` too, so the test script can enforce its time limits:
+- **Go 1.22 or newer.** Install it from [go.dev/dl](https://go.dev/dl/), or with
+  `brew install go` on macOS. Check it with:
+  ```bash
+  go version        # should print go1.22 or higher
+  ```
+- **macOS or Linux.** The system loads applications as Go plugins, which don't work on
+  Windows. Windows users can run everything inside [WSL](https://learn.microsoft.com/windows/wsl/install).
+- **macOS only:** install GNU `coreutils`, so the test script can enforce its time limits:
+  ```bash
+  brew install coreutils
+  ```
+
+### 2. Clone the repo
+
 ```bash
-brew install coreutils
+git clone https://github.com/AtypicalAsian/distributed-map-reduce.git
+cd distributed-map-reduce/src/main
 ```
 
-**Run the full test suite:**
+All of the commands below are run from this `src/main` folder.
+
+### 3. Run the test suite
+
 ```bash
-cd src/main
 bash test-mr.sh
 ```
 
-It checks output correctness (word count and indexer), that Map and Reduce tasks really run
-in parallel, that no task runs more often than needed, that nothing exits early, and that
-the job survives randomly crashing workers. A passing run will look like this:
+The script builds everything itself, so there's no separate build step. It checks that
+the output is correct (word count and indexer), that Map and Reduce tasks really run in
+parallel, that no task runs more often than needed, that nothing exits early, and that the
+job survives randomly crashing workers. It takes a minute or two. A passing run looks like this:
 ```
-  *** Starting wc test.
-  --- wc test: PASS
-  *** Starting indexer test.
-  --- indexer test: PASS
-  *** Starting map parallelism test.
-  --- map parallelism test: PASS
-  *** Starting reduce parallelism test.
-  --- reduce parallelism test: PASS
-  *** Starting job count test.
-  --- job count test: PASS
-  *** Starting early exit test.
-  --- early exit test: PASS
-  *** Starting crash test.
-  --- crash test: PASS
-  *** PASSED ALL TESTS
+*** Starting wc test.
+--- wc test: PASS
+*** Starting indexer test.
+--- indexer test: PASS
+*** Starting map parallelism test.
+--- map parallelism test: PASS
+*** Starting reduce parallelism test.
+--- reduce parallelism test: PASS
+*** Starting job count test.
+--- job count test: PASS
+*** Starting early exit test.
+--- early exit test: PASS
+*** Starting crash test.
+--- crash test: PASS
+*** PASSED ALL TESTS
 ```
 
-To check for rare bugs, run the suite many times in a row: `bash test-mr-many.sh 20`.
-To check for data races, uncomment `RACE=-race` at the top of `test-mr.sh` and run the test suite again.
+Warnings like `rpc.Register: method "Done" has 1 input parameters` and the occasional
+`dial unix ... connection refused` are expected and harmless.
 
-**Run a job by hand (extract word count):**
+**Extra checks:**
+- Catch rare bugs by running the suite many times in a row: `bash test-mr-many.sh 20`
+- Check for data races: uncomment `RACE=-race` at the top of `test-mr.sh`, then run it again.
+
+### 4. Run a job by hand (word count)
+
+Open several terminal windows, and `cd` into `src/main` in **each** of them.
+
+**Terminal 1:** build the word-count plugin and start the coordinator.
 ```bash
-cd src/main
 go build -buildmode=plugin ../mrapps/wc.go
-rm -f mr-out*
+rm -f mr-out-* mr-[0-9]*
+go run mrcoordinator.go pg-*.txt
+```
 
-go run mrcoordinator.go pg-*.txt     # terminal 1
-go run mrworker.go wc.so             # terminal 2, 3, … (as many as you like)
+**Terminals 2, 3, …:** start as many workers as you like (one is enough, three is a good demo).
+```bash
+go run mrworker.go wc.so
+```
 
-cat mr-out-* | sort | more           # view the combined result
+Every process exits on its own when the job is done, after a few seconds. Then view the result:
+```bash
+cat mr-out-* | sort | head -20       # the first 20 words and their counts
+```
+
+Clean up the generated files before the next run:
+```bash
+rm -f mr-out-* mr-[0-9]* wc.so
 ```
 
 ## Demo
