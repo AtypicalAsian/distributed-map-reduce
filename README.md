@@ -23,7 +23,7 @@ Everything else, such as splitting the work, running it in parallel, moving data
 two phases and recovering from crashes, is the framework's job. That's what this project
 implements.
 
-### Job LifeCycle
+### Job Lifecycle
 A job run follows this process:
 
 1. **Split.** Each input file becomes one Map task. The number of Reduce tasks
