@@ -186,7 +186,7 @@ rm -f mr-out-* mr-[0-9]*
 go run mrcoordinator.go pg-*.txt
 ```
 
-**Terminals 2, 3, …:** start as many workers as you like (one is enough, three is a good demo).
+**Terminals 2, 3, …:** start as many workers as you like (one is enough, two or three is usually sufficient).
 ```bash
 go run mrworker.go wc.so
 ```
